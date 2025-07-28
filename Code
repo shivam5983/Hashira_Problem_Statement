@@ -1,0 +1,127 @@
+#include <iostream>
+#include <map>
+#include <vector>
+#include <string>
+#include <cmath>
+#include <set>
+#include <algorithm>
+using namespace std;
+
+// Function to convert a number from any base to decimal (supports base 2 to base 16+)
+long long baseToDecimal(const string& value, int base) {
+    long long result = 0;
+    for (char digit : value) {
+        int d;
+        if (isdigit(digit)) d = digit - '0';
+        else d = tolower(digit) - 'a' + 10;
+        result = result * base + d;
+    }
+    return result;
+}
+
+// Lagrange Interpolation to find f(0) from k points
+long long lagrangeInterpolationAtZero(vector<pair<int, long long>>& points) {
+    long double result = 0;
+
+    int k = points.size();
+    for (int i = 0; i < k; i++) {
+        long double xi = points[i].first;
+        long double yi = points[i].second;
+
+        long double term = yi;
+        for (int j = 0; j < k; j++) {
+            if (i == j) continue;
+            long double xj = points[j].first;
+            term *= (-xj) / (xi - xj);
+        }
+        result += term;
+    }
+
+    return round(result); // f(0)
+}
+
+int main() {
+    // ----- Sample input -----
+    int n = 10, k = 7;
+
+    // Share format: { share_number: {base, value} }
+    map<int, pair<int, string>> shares = {
+        {1, {6, "13444211440455345511"}},
+        {2, {15, "aed7015a346d63"}},
+        {3, {15, "6aeeb69631c227c"}},
+        {4, {16, "e1b5e05623d881f"}},
+        {5, {8, "316034514573652620673"}},
+        {6, {3, "2122212201122002221120200210011020220200"}},
+        {7, {3, "20120221122211000100210021102001201112121"}},
+        {8, {6, "20220554335330240002224253"}},
+        {9, {12, "45153788322a1255483"}},
+        {10, {7, "1101613130313526312514143"}}
+    };
+
+    // Step 1: Convert all shares to decimal values
+    map<int, long long> decimalShares;
+    for (auto& [x, data] : shares) {
+        int base = data.first;
+        string val = data.second;
+        long long y = baseToDecimal(val, base);
+        decimalShares[x] = y;
+    }
+
+    // Step 2: Try all combinations of k shares to find consistent f(0)
+    vector<int> keys;
+    for (auto& [key, _] : decimalShares) keys.push_back(key);
+
+    map<long long, vector<vector<int>>> secretToCombinations;
+
+    // Try all combinations of size k
+    int totalKeys = keys.size();
+    vector<bool> select(totalKeys, false);
+    fill(select.end() - k, select.end(), true);
+
+    do {
+        vector<pair<int, long long>> points;
+        vector<int> usedKeys;
+        for (int i = 0; i < totalKeys; i++) {
+            if (select[i]) {
+                int x = keys[i];
+                points.emplace_back(x, decimalShares[x]);
+                usedKeys.push_back(x);
+            }
+        }
+
+        long long secret = lagrangeInterpolationAtZero(points);
+        secretToCombinations[secret].push_back(usedKeys);
+
+    } while (next_permutation(select.begin(), select.end()));
+
+    // Step 3: Find the most frequent secret
+    long long finalSecret = 0;
+    int maxCount = 0;
+    for (auto& [secret, combos] : secretToCombinations) {
+        if ((int)combos.size() > maxCount) {
+            maxCount = combos.size();
+            finalSecret = secret;
+        }
+    }
+
+    // Step 4: Mark invalid shares (ones not part of consistent secret)
+    set<int> valid;
+    for (auto& v : secretToCombinations[finalSecret]) {
+        valid.insert(v.begin(), v.end());
+    }
+
+    vector<int> invalidShares;
+    for (auto& [key, _] : decimalShares) {
+        if (valid.count(key) == 0) {
+            invalidShares.push_back(key);
+        }
+    }
+
+    // ----- Final Output -----
+    cout << "✅ Secret: " << finalSecret << endl;
+    cout << "❌ Invalid Shares: ";
+    for (int x : invalidShares) cout << x << " ";
+    cout << endl;
+
+    return 0;
+}
